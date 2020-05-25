@@ -2,36 +2,27 @@
 #import "../TypingNotifications.h"
 #import <rocketbootstrap/rocketbootstrap.h>
 #import <AppSupport/CPDistributedMessagingCenter.h>
-
-@interface IMItem : NSObject
-@property (nonatomic,retain) NSString * handle;
-@property (nonatomic,readonly) BOOL isFromMe; 
-@property (nonatomic, retain) NSDictionary *senderInfo;
-@property (nonatomic, retain) NSString *sender;
-@end
-
-@interface IMMessageItem : IMItem
-@property (nonatomic,retain) NSString * subject;
-@property (nonatomic,retain) NSAttributedString * body;
-@property (assign,nonatomic) unsigned long long flags;
-@property (nonatomic,readonly) BOOL isTypingMessage; 
-@property (nonatomic,retain) NSData * typingIndicatorIcon;
-@end
-
-@interface FZMessage : IMMessageItem
-@end
-
-@interface MessageServiceSession: NSObject 
--(BOOL)didReceiveMessages:(NSArray <FZMessage *> *)messages forChat:(NSString *)arg2 style:(unsigned char)arg3 account:(id)arg4;
--(void) _typingIndicator_postMessage:(IBMessageType) type handle:(NSString *)handle isTyping:(BOOL) typing;
-@end
+#import "Headers.h"
 
 #define IMMessageItemFlagsTypingBegan 0
 #define IMMessageItemFlagsTypingEnded 9
 #define IMMessageItemFlagsRecordingBegan 2097160
 #define IMMessageItemFlagsRecordingEnded 18874369
 
-CPDistributedMessagingCenter *center;
+void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
+	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		NSDictionary *userInfo = @{
+        	@"type": @(type),
+			@"handle": handle,
+			@"isTyping": @(isTyping)
+    	};
+
+    	HBLogDebug(@"TypingIndicator: sending %@", userInfo);
+		CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"com.itaysoft.typingindicator.springboard"];
+    	rocketbootstrap_distributedmessagingcenter_apply(center);
+    	[center sendMessageName:@"change" userInfo:userInfo];
+	});
+}
 
 %group iMessage
 
@@ -45,26 +36,50 @@ CPDistributedMessagingCenter *center;
 	FZMessage *message = messages.firstObject;
 	if(message.isTypingMessage) {
 		if(message.flags == IMMessageItemFlagsTypingBegan) {
-			[self _typingIndicator_postMessage:IBMessageTypeTypingBegan handle:message.sender isTyping:YES];
+			IBTIPostMessage(IBTIMessageTypeTypingBegan,message.sender,YES);
 		} else if(message.flags == IMMessageItemFlagsRecordingBegan) {
-			[self _typingIndicator_postMessage:IBMessageTypeRecordingBegan handle:message.sender isTyping:YES];
+			IBTIPostMessage(IBTIMessageTypeRecordingBegan,message.sender,YES);
 		}
 	} else {
-		[self _typingIndicator_postMessage:IBMessageTypeTypingBegan handle:message.sender isTyping:NO];
+		IBTIPostMessage(IBTIMessageTypeTypingEnded,message.sender,NO);
 	}
     return %orig;
 }
 
-%new
-- (void) _typingIndicator_postMessage:(IBMessageType) type handle:(NSString *)handle isTyping:(BOOL) typing {
-	NSDictionary *userInfo = @{
-        @"type": @(type),
-		@"handle": handle,
-		@"isTyping": @(typing)
-    };
+%end
 
-    HBLogDebug(@"TypingIndicator: sending %@", userInfo);
-    [center sendMessageName:@"change" userInfo:userInfo];
+%hook IMDFileTransferCenter
+
+- (void)_addActiveTransfer:(NSString *)transferGUID {
+	HBLogDebug(@"TypingIndicator: _addActiveTransfer");
+	%orig;
+
+	IMFileTransfer *transfer = [self transferForGUID:transferGUID];
+	IBTIPostMessage(IBTIMessageTypeSendingFile,transfer.otherPerson,YES);
+}
+
+- (void)updateTransfer:(NSString *)transferGUID currentBytes:(size_t)currentBytes totalBytes:(size_t)totalBytes {
+    HBLogDebug(@"TypingIndicator: updateTransfer");
+
+	%orig;
+
+	if (currentBytes >= totalBytes) {
+		IMFileTransfer *transfer = [self transferForGUID:transferGUID];
+		IBTIPostMessage(IBTIMessageTypeTypingEnded,transfer.otherPerson,NO);
+	}
+}
+
+%end
+
+%hook IMDServiceSession
+
+- (void)didReceiveMessageReadReceiptForMessageID:(NSString *)messageID date:(NSDate *)date completionBlock:(id)completion {
+	HBLogDebug(@"TypingIndicator: didReceiveMessageReadReceiptForMessageID");
+	
+	%orig;
+
+	FZMessage *message = [[%c(IMDMessageStore) sharedInstance] messageWithGUID:messageID];
+	IBTIPostMessage(IBTIMessageTypeReadReceipt, message.handle, NO);
 }
 
 %end
@@ -90,6 +105,4 @@ static void bundleLoaded(CFNotificationCenterRef center, void *observer, CFStrin
 		                            (CFStringRef)NSBundleDidLoadNotification,
 		                            NULL, 
                                     CFNotificationSuspensionBehaviorCoalesce);
-	center = [CPDistributedMessagingCenter centerNamed:@"com.itaysoft.typingindicator.springboard"];
-    rocketbootstrap_distributedmessagingcenter_apply(center);
 }

@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = TypingIndicatorImagent
 
-TypingIndicatorImagent_FILES = Tweak.x
+TypingIndicatorImagent_FILES = Imagent.x
 TypingIndicatorImagent_CFLAGS = -fobjc-arc
 TypingIndicatorImagent_PRIVATE_FRAMEWORKS = IMSharedUtilities AppSupport
 TypingIndicatorImagent_LIBRARIES = rocketbootstrap
