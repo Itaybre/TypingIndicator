@@ -12,9 +12,9 @@
 void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
 	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 		NSDictionary *userInfo = @{
-        	@"type": @(type),
-			@"handle": handle,
-			@"isTyping": @(isTyping)
+        	@"Type": @(type),
+			@"Name": handle,
+			@"IsTyping": @(isTyping)
     	};
 
     	HBLogDebug(@"TypingIndicator: sending %@", userInfo);
@@ -30,17 +30,27 @@ void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
 
 -(BOOL)didReceiveMessages:(NSArray <FZMessage *> *)messages forChat:(NSString *)arg2 style:(unsigned char)arg3 account:(id)arg4 {
 	HBLogDebug(@"TypingIndicator: %@", messages.firstObject);
-	HBLogDebug(@"TypingIndicator: isTyping %i", messages.firstObject.isTypingMessage);
-	HBLogDebug(@"TypingIndicator: flags %llu", messages.firstObject.flags);
-	HBLogDebug(@"TypingIndicator: sender %@", messages.firstObject.sender);
+	
 	FZMessage *message = messages.firstObject;
 	if(message.isTypingMessage) {
+		// THe message is typing status update
+
 		if(message.flags == IMMessageItemFlagsTypingBegan) {
+			// Someone started typing
+
 			IBTIPostMessage(IBTIMessageTypeTypingBegan,message.sender,YES);
 		} else if(message.flags == IMMessageItemFlagsRecordingBegan) {
+			// Someone is recording a message
+
 			IBTIPostMessage(IBTIMessageTypeRecordingBegan,message.sender,YES);
+		} else {
+			// Clear status
+
+			IBTIPostMessage(IBTIMessageTypeTypingEnded,message.sender,NO);	
 		}
 	} else {
+		// Regular message
+
 		IBTIPostMessage(IBTIMessageTypeTypingEnded,message.sender,NO);
 	}
     return %orig;
@@ -51,21 +61,26 @@ void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
 %hook IMDFileTransferCenter
 
 - (void)_addActiveTransfer:(NSString *)transferGUID {
-	HBLogDebug(@"TypingIndicator: _addActiveTransfer");
+	HBLogDebug(@"TypingIndicator: New file transfer");
 	%orig;
 
 	IMFileTransfer *transfer = [self transferForGUID:transferGUID];
-	IBTIPostMessage(IBTIMessageTypeSendingFile,transfer.otherPerson,YES);
+	if(transfer.otherPerson) {
+		IBTIPostMessage(IBTIMessageTypeSendingFile,transfer.otherPerson,YES);
+	}
 }
 
 - (void)updateTransfer:(NSString *)transferGUID currentBytes:(size_t)currentBytes totalBytes:(size_t)totalBytes {
-    HBLogDebug(@"TypingIndicator: updateTransfer");
+    HBLogDebug(@"TypingIndicator: Transfer updated");
 
 	%orig;
 
 	if (currentBytes >= totalBytes) {
 		IMFileTransfer *transfer = [self transferForGUID:transferGUID];
-		IBTIPostMessage(IBTIMessageTypeTypingEnded,transfer.otherPerson,NO);
+
+		if(transfer.otherPerson) {
+			IBTIPostMessage(IBTIMessageTypeTypingEnded,transfer.otherPerson,NO);
+		}
 	}
 }
 
@@ -74,7 +89,7 @@ void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
 %hook IMDServiceSession
 
 - (void)didReceiveMessageReadReceiptForMessageID:(NSString *)messageID date:(NSDate *)date completionBlock:(id)completion {
-	HBLogDebug(@"TypingIndicator: didReceiveMessageReadReceiptForMessageID");
+	HBLogDebug(@"TypingIndicator: Read Receipt Received");
 	
 	%orig;
 
@@ -88,7 +103,7 @@ void IBTIPostMessage(IBTIMessageType type, NSString *handle, BOOL isTyping) {
 
 static void bundleLoaded(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     NSBundle* bundle = (__bridge NSBundle*)(object);
-	HBLogDebug(@"iCU - Bundle Loaded: %@", bundle.bundleIdentifier);
+	HBLogDebug(@"TypingIndicator: Bundle Loaded: %@", bundle.bundleIdentifier);
     if ([bundle.bundleIdentifier isEqualToString:@"com.apple.imservice.imessage"]) {
 		%init(iMessage);
 	}
