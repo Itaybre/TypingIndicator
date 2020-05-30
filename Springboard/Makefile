@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = TypingIndicatorSB
 
-TypingIndicatorSB_FILES = Tweak.x
+TypingIndicatorSB_FILES = $(wildcard *.[xm])
 TypingIndicatorSB_CFLAGS = -fobjc-arc
 TypingIndicatorSB_LIBRARIES = rocketbootstrap
 TypingIndicatorSB_PRIVATE_FRAMEWORKS = AppSupport

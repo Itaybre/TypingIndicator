@@ -1,9 +1,9 @@
 Package: com.itaysoft.typingindicator
-Name: TypingIndicator
-Depends: mobilesubstrate, com.rpetrich.rocketbootstrap
-Version: 0.0.1
+Name: TypingNotification
+Depends: mobilesubstrate, com.rpetrich.rocketbootstrap, ws.hbang.common (>= 1.11), com.cokepokes.libnotifications (>= 0.2-5)
+Version: 0.0.2
 Architecture: iphoneos-arm
-Description: Get notifications when is writing you a message
+Description: Get notifications when someone is writing you a message
 Maintainer: Itay
 Author: Itay
 Section: Tweaks
