@@ -7,3 +7,7 @@ Description: Get notifications when someone is writing you a message
 Maintainer: Itay
 Author: Itay
 Section: Tweaks
+Icon: https://www.icaughtuapp.com/repo/icons/com.itaysoft.typingindicator.png
+Depiction: https://www.icaughtuapp.com/repo/depictions/web/?p=com.itaysoft.typingindicator
+SileoDepiction: https://www.icaughtuapp.com/repo/depictions/native/com.itaysoft.typingindicator/depiction.json
+
